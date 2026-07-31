@@ -38,12 +38,12 @@ if (Hud.on) {
   Hud.bars_4 = Image("hud/signal-bars-4.png").Scale(Skull.U(180), Skull.U(48));
   Hud.bars_5 = Image("hud/signal-bars-5.png").Scale(Skull.U(180), Skull.U(48));
 
-  Hud.text_trace = Image.Text("TRACE INITIATED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_subject = Image.Text("SUBJECT ACQUIRED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_link = Image.Text("VISUAL LINK ESTABLISHED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_lock = Image.Text("TARGET LOCKED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_match = Image.Text("BIOMETRIC MATCH", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_breach = Image.Text("CONNECTION COMPROMISED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_trace = text_image("TRACE INITIATED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_subject = text_image("SUBJECT ACQUIRED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_link = text_image("VISUAL LINK ESTABLISHED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_lock = text_image("TARGET LOCKED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_match = text_image("BIOMETRIC MATCH", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_breach = text_image("CONNECTION COMPROMISED", 0.86, 0.86, 0.86, 1, ui_font);
 
   Hud.grid = Sprite(Hud.grid_image);
   Hud.brackets = Sprite(Hud.bracket_sweep);

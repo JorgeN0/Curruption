@@ -20,6 +20,7 @@ REQUIRED = (
     "animation_duration",
     "animation_speed",
     "refresh_rate",
+    "compat_profile",
     "gore_enabled",
     "jaw_open_distance",
     "blood_overlay_opacity",

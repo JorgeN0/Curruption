@@ -3,6 +3,7 @@
 Config.animation_duration = 10.0;
 Config.animation_speed = 1.0;
 Config.refresh_rate = 30;
+Config.compat_profile = 0;
 Config.gore_enabled = 1;
 Config.jaw_open_distance = 42;
 Config.blood_overlay_opacity = 1.0;

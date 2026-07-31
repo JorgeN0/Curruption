@@ -56,6 +56,18 @@ if (scale > 1.15) {
   watch_font = "Monospace Bold 54";
 }
 
+# Compatibility fallback profile for stricter/older Plymouth builds.
+# 0 = full feature path.
+# 1 = no SetRefreshRate request and no explicit font argument in Image.Text.
+Compat.profile = Config.compat_profile;
+Compat.fallback = 0;
+if (Compat.profile >= 1) Compat.fallback = 1;
+
+fun text_image(text, r, g, b, a, font_name) {
+  if (Compat.fallback) return Image.Text(text, r, g, b, a);
+  return Image.Text(text, r, g, b, a, font_name);
+}
+
 State.tick = 0;
 State.elapsed = 0;
 State.progress = 0;

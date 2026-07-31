@@ -34,11 +34,21 @@ Linux with Plymouth is required for the real theme.
 ```bash
 ./scripts/build.sh
 sudo ./installer/install.sh
-sudo plymouth-set-default-theme -R curruption
+sudo ./installer/install.sh --set-default
 ```
 
 `install.sh` never changes the active theme unless you pass `--set-default`,
 because switching themes rebuilds the initramfs.
+
+On Arch-family systems, run diagnostics before activation:
+
+```bash
+sudo ./installer/install.sh --diagnose
+```
+
+This checks Plymouth runtime/plugin availability, initramfs integration
+(`mkinitcpio`/`dracut`), and kernel cmdline splash flags, then prints likely
+failure mode classification and log collection commands.
 
 Test without rebooting:
 
@@ -63,6 +73,7 @@ committed so the theme can also be installed without a Python toolchain.
 | `animation_duration` | 10.0 | wall-clock point at which everything blanks |
 | `animation_speed` | 1.0 | stretches or compresses the whole timeline (0.55 gives a ~5.5 s cut) |
 | `refresh_rate` | 30 | ticks per second the script plugin is driven at |
+| `compat_profile` | 0 | 1 enables a stricter fallback path (no `SetRefreshRate`, no font arg in `Image.Text`; pair with `refresh_rate=50`) |
 | `gore_enabled` | 1 | 0 falls back to the clean skull layers |
 | `jaw_open_distance` | 42 | how far into the authored scream frames the jaw travels |
 | `blood_overlay_opacity` | 1.0 | crack/blood tracery overlay only; the approved blood is baked into the artwork |
@@ -123,4 +134,5 @@ the modules load, confirms the approved concept is unmodified, and re-checks
 the gore-skull layer geometry against all three scream frames.
 
 See [docs/DESIGN.md](docs/DESIGN.md), [docs/TIMING.md](docs/TIMING.md) and
-[docs/ASSET_CATALOG.md](docs/ASSET_CATALOG.md).
+[docs/ASSET_CATALOG.md](docs/ASSET_CATALOG.md). For Arch-specific setup and
+validation, see [docs/ARCH_PLYMOUTH_TROUBLESHOOTING.md](docs/ARCH_PLYMOUTH_TROUBLESHOOTING.md).
