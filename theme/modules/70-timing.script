@@ -1,0 +1,179 @@
+# Clock, orchestration, and Plymouth lifecycle.
+#
+# The clock counts refresh ticks rather than reading wall time, so the
+# sequence is frame-exact and reproducible. Config.refresh_rate must match the
+# rate Plymouth actually drives the script plugin at; SetRefreshRate is
+# requested below, and the value can be corrected in config/theme.conf if a
+# particular Plymouth build ignores it.
+
+Plymouth.SetRefreshRate(Config.refresh_rate);
+
+# The two beats that are the story rather than the interface, so they are
+# independent of hud_enabled.
+#
+# Both are letter-spaced. Monospace already sets an even rhythm; opening it up
+# further slows the eye down and stops the words reading as a status line. It
+# is the cheapest way to make short text feel deliberate rather than logged,
+# and Plymouth gives no tracking control otherwise.
+Failure.text = Image.Text("S I G N A L   L O S T", 0.92, 0.92, 0.92, 1, story_font);
+Failure.label = Sprite(Failure.text);
+Failure.label.SetZ(98);
+Failure.label.SetOpacity(0);
+Failure.w = Failure.text.GetWidth();
+
+Watching.text = Image.Text("B I G   B R O T H E R   I S   W A T C H I N G",
+                           1.0, 1.0, 1.0, 1, watch_font);
+Watching.label = Sprite(Watching.text);
+Watching.label.SetZ(99);
+Watching.label.SetOpacity(0);
+Watching.w = Watching.text.GetWidth();
+Watching.y = Math.Int(layout.bottom - Watching.text.GetHeight());
+
+# Mode 0 renders the sequence. Any other mode means Plymouth needs the screen
+# for a prompt, so the sequence gets out of the way immediately.
+Mode.current = 0;
+Mode.prompt = Sprite();
+Mode.prompt.SetZ(120);
+Mode.prompt.SetOpacity(0);
+Mode.message = Sprite();
+Mode.message.SetZ(120);
+Mode.message.SetOpacity(0);
+
+State.finished = 0;
+State.blanked = 0;
+
+fun Curruption.Draw(t) {
+  Smoke.Update(t);
+  BigBrother.Update(t);
+  Skull.Update(t);
+  DanglingEye.Update(t);
+  Eyes.Update(t);
+  Hud.Update(t);
+  Glitch.Update(t);
+
+  lost = hold(t, T.lost_in, T.lost_out) * flicker(State.tick, 11);
+  place(Failure.label, screen.cx - Failure.w / 2, screen.cy + Skull.U(345), lost);
+
+  # Steady, not flickering: everything else on screen has failed, and this has
+  # not. It materialises slowly rather than cutting in, and is the last thing
+  # on the screen before black.
+  watching = ramp(t, T.watch_text, T.watch_text + 0.35)
+           * (1 - ramp(t, T.watch_out - 0.08, T.watch_out));
+  place(Watching.label, screen.cx - Watching.w / 2, Watching.y, watching);
+}
+
+# Every system already collapses to nothing past the end of the timeline, so
+# one update well past it is a complete, single-path blank. The time is taken
+# from the timeline rather than from animation_duration, which a user is free
+# to set short.
+fun Curruption.Blank() {
+  Curruption.Draw(T.end + 10);
+  Failure.label.SetOpacity(0);
+  Watching.label.SetOpacity(0);
+}
+
+fun Curruption.Refresh() {
+  State.tick = State.tick + 1;
+
+  if (Mode.current != 0) {
+    if (State.blanked == 0) {
+      Curruption.Blank();
+      State.blanked = 1;
+    }
+    return;
+  }
+
+  if (State.finished) return;
+
+  State.elapsed = State.tick / Config.refresh_rate * Config.animation_speed;
+  t = State.elapsed;
+
+  if (t >= Config.animation_duration) {
+    # Final frame is total black so the display-manager handoff cannot flash.
+    Curruption.Blank();
+    State.finished = 1;
+    return;
+  }
+
+  Curruption.Draw(t);
+}
+
+# --- Plymouth lifecycle -----------------------------------------------------
+# None of these block boot progress; the sequence never waits on them and
+# never holds the splash open.
+
+fun Curruption.BootProgress(duration, progress) {
+  State.progress = progress;
+}
+
+fun Curruption.Bullets(count) {
+  text = "";
+  n = count;
+  if (n > 32) n = 32;
+  i = 0;
+  while (i < n) {
+    text = text + "*";
+    i = i + 1;
+  }
+  return text;
+}
+
+# Disk unlock and any other prompt must be readable, so the sequence yields
+# the screen rather than competing with it.
+fun Curruption.DisplayPassword(prompt, bullets) {
+  Mode.current = 1;
+  State.blanked = 0;
+  label = prompt;
+  if (label == "") label = "ENTER PASSPHRASE";
+  image = Image.Text(label + "   " + Curruption.Bullets(bullets),
+                     0.9, 0.9, 0.9, 1, ui_font);
+  Mode.prompt.SetImage(image);
+  Mode.prompt.SetX(screen.cx - image.GetWidth() / 2);
+  Mode.prompt.SetY(screen.cy - image.GetHeight() / 2);
+  Mode.prompt.SetOpacity(1);
+}
+
+fun Curruption.DisplayQuestion(prompt, entry) {
+  Mode.current = 2;
+  State.blanked = 0;
+  image = Image.Text(prompt + "   " + entry, 0.9, 0.9, 0.9, 1, ui_font);
+  Mode.prompt.SetImage(image);
+  Mode.prompt.SetX(screen.cx - image.GetWidth() / 2);
+  Mode.prompt.SetY(screen.cy - image.GetHeight() / 2);
+  Mode.prompt.SetOpacity(1);
+}
+
+fun Curruption.DisplayNormal() {
+  Mode.current = 0;
+  Mode.prompt.SetOpacity(0);
+  # The sequence does not restart; it stays where it ended.
+  if (State.finished) Curruption.Blank();
+}
+
+fun Curruption.Message(text) {
+  image = Image.Text(text, 0.72, 0.72, 0.72, 1, ui_font);
+  Mode.message.SetImage(image);
+  Mode.message.SetX(screen.cx - image.GetWidth() / 2);
+  Mode.message.SetY(layout.bottom - image.GetHeight());
+  Mode.message.SetOpacity(1);
+}
+
+fun Curruption.HideMessage(text) {
+  Mode.message.SetOpacity(0);
+}
+
+fun Curruption.Quit() {
+  State.quitting = 1;
+  Mode.prompt.SetOpacity(0);
+  Mode.message.SetOpacity(0);
+  Curruption.Blank();
+}
+
+Plymouth.SetRefreshFunction(Curruption.Refresh);
+Plymouth.SetBootProgressFunction(Curruption.BootProgress);
+Plymouth.SetDisplayPasswordFunction(Curruption.DisplayPassword);
+Plymouth.SetDisplayQuestionFunction(Curruption.DisplayQuestion);
+Plymouth.SetDisplayNormalFunction(Curruption.DisplayNormal);
+Plymouth.SetMessageFunction(Curruption.Message);
+Plymouth.SetHideMessageFunction(Curruption.HideMessage);
+Plymouth.SetQuitFunction(Curruption.Quit);

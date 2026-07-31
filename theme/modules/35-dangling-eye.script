@@ -1,0 +1,87 @@
+# Dangling eyeball and optic nerve.
+#
+# The viewer-right socket is the only one holding an eye; the viewer-left
+# socket stays empty. The scream frames already carry the eyeball, so this
+# module adds the one thing three keyframes cannot: motion independent of the
+# jaw. It cuts the x 352..432 / y 352..440 column out of whichever frame is
+# currently displayed and re-lays it a few pixels inboard, taking the lower
+# optic nerve with it. The upper nerve stays anchored in the socket, so the
+# two read as one attached system that flexes where the bulb hangs.
+#
+# The swing is a deterministic sine pendulum; Plymouth has no physics and does
+# not need any here. The tile is never rotated, which is what keeps the iris
+# aimed downward through the whole swing.
+#
+# Travel is inboard only, and clamped. Sliding the opaque tile left uncovers
+# x 428..432 of the frame underneath, which is black in all three frames; a
+# wider or outward slide would uncover the bulb's own edge and tear it.
+#
+# OFF BY DEFAULT. In the hyper-real masters the eyeball is nestled against the
+# cheek with no black corridor beside it, so the seam clears bone by only a
+# few levels and the cut shows at full travel. The three authored frames move
+# the eyeball on their own; this is an opt-in for a wider swing, and the swing
+# should be kept small if it is turned on.
+
+DanglingEye.on = 0;
+if (Config.dangling_eye_enabled && Skull.gore) DanglingEye.on = 1;
+
+if (DanglingEye.on) {
+  DanglingEye.dx = Skull.U(Skull.EYE_COL);
+  DanglingEye.dy = Skull.U(Skull.BULB_TOP);
+  DanglingEye.w = Skull.U(Skull.BULB_RIGHT) - DanglingEye.dx;
+  DanglingEye.h = Skull.U(Skull.BULB_BOTTOM) - DanglingEye.dy;
+
+  # One cut per authored frame, so the column always matches the jaw state.
+  DanglingEye.cut_0 = Skull.frame_0.Crop(DanglingEye.dx, DanglingEye.dy,
+                                         DanglingEye.w, DanglingEye.h);
+  DanglingEye.cut_1 = Skull.frame_1.Crop(DanglingEye.dx, DanglingEye.dy,
+                                         DanglingEye.w, DanglingEye.h);
+  DanglingEye.cut_2 = Skull.frame_2.Crop(DanglingEye.dx, DanglingEye.dy,
+                                         DanglingEye.w, DanglingEye.h);
+  DanglingEye.sprite = Sprite(DanglingEye.cut_0);
+  DanglingEye.sprite.SetZ(13);
+  DanglingEye.sprite.SetOpacity(0);
+  DanglingEye.frame = 0;
+
+  # Nerve root at master (372, 300), bulb centre at master (382, 408).
+  DanglingEye.length = 108 * scale;
+  DanglingEye.amplitude = Config.dangling_eye_sway * DanglingEye.length;
+  # Hard ceiling in master pixels: past this the slide uncovers artwork.
+  DanglingEye.limit = 4 * scale;
+  if (DanglingEye.amplitude > DanglingEye.limit)
+    DanglingEye.amplitude = DanglingEye.limit;
+}
+
+fun DanglingEye.SetFrame(index) {
+  if (DanglingEye.frame == index) return;
+  DanglingEye.frame = index;
+  if (index == 0) DanglingEye.sprite.SetImage(DanglingEye.cut_0);
+  if (index == 1) DanglingEye.sprite.SetImage(DanglingEye.cut_1);
+  if (index == 2) DanglingEye.sprite.SetImage(DanglingEye.cut_2);
+}
+
+fun DanglingEye.Update(t) {
+  if (DanglingEye.on == 0) return;
+  if (Skull.reveal <= 0.004) {
+    DanglingEye.sprite.SetOpacity(0);
+    return;
+  }
+  DanglingEye.SetFrame(Skull.frame);
+
+  # Almost still at first, then a slow build to a heavy sway that never
+  # entirely settles.
+  amp = ease(ramp(t, T.sway_in, T.sway_full)) * 0.86;
+  amp = amp + ease(ramp(t, T.jaw_in, T.jaw_out)) * 0.14;
+  phase = (t - T.sway_in) * Config.dangling_eye_speed * 3.93;
+
+  # (1 - cos)/2 starts at rest and swings inboard and back, so the tile never
+  # travels outward past the artwork it is covering.
+  swing = 0 - amp * DanglingEye.amplitude * (1 - Math.Cos(phase)) * 0.5;
+  # One frame behind the skull's displacement, which is what reads as mass.
+  drag = State.jitter_prev * 0.62 - State.jitter;
+
+  place(DanglingEye.sprite,
+        Skull.x + DanglingEye.dx + swing + drag,
+        Skull.y + DanglingEye.dy,
+        Skull.reveal);
+}

@@ -1,0 +1,71 @@
+# The watcher.
+#
+# One anonymous human eye, held back until the very end. The whole sequence up
+# to this point is a system tracing, acquiring and confirming a subject; when
+# the link finally dies, the eye resolves out of the static and puts its own
+# reticle on the viewer. The reversal is the point: the thing doing the
+# watching was never the machine.
+#
+# It resolves through four preloaded states — corrupted, recognition pass,
+# clean, tracked — and never moves. Stillness is what makes it read as
+# attention rather than as an animation.
+
+BigBrother.enabled = Config.big_brother_eye_enabled;
+
+if (BigBrother.enabled) {
+  # Sized against both axes so it stays a face looking out of a feed rather
+  # than a full-screen splash, and leaves the lower band clear for the caption.
+  BigBrother.w = screen.w * 0.52;
+  if (BigBrother.w > screen.h * 0.74) BigBrother.w = screen.h * 0.74;
+  BigBrother.w = Math.Int(BigBrother.w);
+  BigBrother.h = Math.Int(BigBrother.w * 576 / 1024);
+
+  # Decoded and scaled once; the refresh callback only swaps between these.
+  BigBrother.corrupted = Image("eye/eye-corrupted.png").Scale(BigBrother.w, BigBrother.h);
+  BigBrother.harsh = Image("eye/eye-high-contrast.png").Scale(BigBrother.w, BigBrother.h);
+  BigBrother.clean = Image("eye/eye-surveillance.png").Scale(BigBrother.w, BigBrother.h);
+  BigBrother.tracked = Image("eye/eye-tracked.png").Scale(BigBrother.w, BigBrother.h);
+
+  BigBrother.sprite = Sprite(BigBrother.corrupted);
+  # Above the subject and the HUD, below the scanlines and the terminal mask,
+  # so the eye comes up through the interference rather than on top of it.
+  BigBrother.sprite.SetZ(80);
+  BigBrother.sprite.SetOpacity(0);
+  BigBrother.state = 0;
+
+  BigBrother.home_x = Math.Int(screen.cx - BigBrother.w / 2);
+  BigBrother.home_y = Math.Int(screen.cy - BigBrother.h / 2 - screen.h * 0.06);
+}
+
+fun BigBrother.SetState(state) {
+  if (BigBrother.state == state) return;
+  BigBrother.state = state;
+  if (state == 1) BigBrother.sprite.SetImage(BigBrother.corrupted);
+  if (state == 2) BigBrother.sprite.SetImage(BigBrother.harsh);
+  if (state == 3) BigBrother.sprite.SetImage(BigBrother.clean);
+  if (state == 4) BigBrother.sprite.SetImage(BigBrother.tracked);
+}
+
+fun BigBrother.Update(t) {
+  if (BigBrother.enabled == 0) return;
+  if (t < T.watch_in || t >= T.watch_out) {
+    BigBrother.sprite.SetOpacity(0);
+    return;
+  }
+
+  # Offsets from watch_in rather than absolute times, so retiming the sequence
+  # cannot leave the resolve stranded behind the beat it belongs to.
+  state = 1;
+  if (t >= T.watch_in + 0.28) state = 2;
+  if (t >= T.watch_in + 0.48) state = 3;
+  # The reticle turns around and settles on whoever is reading the screen,
+  # and then simply stays there for the rest of the sequence.
+  if (t >= T.watch_in + 0.90) state = 4;
+  BigBrother.SetState(state);
+
+  level = ramp(t, T.watch_in, T.watch_in + 0.13);
+  # Unstable only while it is still coming out of the interference.
+  if (t < T.watch_in + 0.48) level = level * flicker(State.tick, 5);
+
+  place(BigBrother.sprite, BigBrother.home_x, BigBrother.home_y, level);
+}

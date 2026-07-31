@@ -1,0 +1,36 @@
+# Red ignition.
+#
+# The moment the subject registers the observer. Hard on, hard off, no fade,
+# no bloom ramp.
+#
+# Only the empty viewer-left socket ignites. The viewer-right socket has its
+# eye hanging out of it on the optic nerve — there is nothing left in there to
+# light up, and lighting it anyway read as a decoration rather than as a
+# reaction.
+#
+# Anchored to the hyper-real master, whose viewer-left socket sits at a
+# darkness centroid of (217, 251) and is about 100 px across — wider and lower
+# than the flat concept it replaced.
+#
+# eyes.png carries two glows 112 px apart, centred at (72, 64) and (184, 64).
+# Cropping its left half isolates one, which is scaled to 204 px so the bloom
+# fills the socket, putting the glow centre at (115, 102) inside the tile.
+
+Eyes.size = Skull.U(204);
+Eyes.dx = Skull.U(102);   # 217 - 115
+Eyes.dy = Skull.U(149);   # 251 - 102
+
+Eyes.glow_image = Image("skull/eyes.png").Crop(0, 0, 128, 128).Scale(Eyes.size, Eyes.size);
+Eyes.core_image = Image("skull/eye-cores.png").Crop(0, 0, 128, 128).Scale(Eyes.size, Eyes.size);
+Eyes.glow = Sprite(Eyes.glow_image);
+Eyes.core = Sprite(Eyes.core_image);
+Eyes.glow.SetZ(20);
+Eyes.core.SetZ(21);
+Eyes.glow.SetOpacity(0);
+Eyes.core.SetOpacity(0);
+
+fun Eyes.Update(t) {
+  lit = hold(t, T.ignite_in, T.ignite_in + Config.eye_duration);
+  place(Eyes.glow, Skull.x + Eyes.dx, Skull.y + Eyes.dy, lit * 0.85);
+  place(Eyes.core, Skull.x + Eyes.dx, Skull.y + Eyes.dy, lit);
+}

@@ -1,0 +1,281 @@
+# Signal corruption.
+#
+# Every burst is a deterministic function of the 30 fps tick and the configured
+# seed, so two machines with the same config corrupt identically. All images
+# are decoded and scaled once here; the refresh callback only swaps between
+# preloaded pairs, moves sprites, and sets opacity.
+#
+# Two classes of layer, for a reason:
+#
+#   washes  cover everything they are drawn over: noise, static and the
+#           terminal mask. A wash with a hard rectangular edge reads as a box
+#           sitting on the picture rather than as damage to the signal, so
+#           these have to reach the edges of the screen. They do it as a 2x2
+#           grid of sprites sharing one quarter-screen image, which costs a
+#           quarter of the memory of a screen-sized layer and repeats
+#           invisibly because the artwork is random.
+#   marks   are sparse: tears, packet strips, compression blocks, channel
+#           split, data-mosh. These stay a fixed field centred on the subject.
+#           There is no edge to see, and damage concentrated on the subject is
+#           what the sequence is about.
+#
+# Scanlines are a third case: periodic in y and uniform in x, so one
+# screen-wide strip stacked down the display is exact and nearly free.
+
+Glitch.field = Math.Int(512 * scale * 1.4);
+Glitch.fx = Math.Int(screen.cx - Glitch.field / 2);
+Glitch.fy = Math.Int(screen.cy - Glitch.field / 2);
+
+Glitch.wash_w = Math.Int(screen.w / 2) + 1;
+Glitch.wash_h = Math.Int(screen.h / 2) + 1;
+Glitch.wash_count = 4;
+
+Glitch.noise_image = Image("effects/noise.png").Scale(Glitch.wash_w, Glitch.wash_h);
+Glitch.static_image = Image("effects/static-burst.png").Scale(Glitch.wash_w, Glitch.wash_h);
+Glitch.mask_image = Image("effects/signal-loss.png").Scale(Glitch.wash_w, Glitch.wash_h);
+
+i = 0;
+while (i < Glitch.wash_count) {
+  wx = (i % 2) * Glitch.wash_w;
+  wy = Math.Int(i / 2) * Glitch.wash_h;
+
+  Glitch.noise[i] = Sprite(Glitch.noise_image);
+  Glitch.noise[i].SetZ(60);
+  Glitch.noise[i].SetX(wx);
+  Glitch.noise[i].SetY(wy);
+  Glitch.noise[i].SetOpacity(0);
+
+  Glitch.static[i] = Sprite(Glitch.static_image);
+  Glitch.static[i].SetZ(71);
+  Glitch.static[i].SetX(wx);
+  Glitch.static[i].SetY(wy);
+  Glitch.static[i].SetOpacity(0);
+
+  Glitch.mask[i] = Sprite(Glitch.mask_image);
+  Glitch.mask[i].SetZ(95);
+  Glitch.mask[i].SetX(wx);
+  Glitch.mask[i].SetY(wy);
+  Glitch.mask[i].SetOpacity(0);
+
+  i = i + 1;
+}
+
+Glitch.tear_image = Image("effects/horizontal-tear.png").Scale(Glitch.field, Glitch.field);
+Glitch.offset_image = Image("effects/image-offset.png").Scale(Glitch.field, Glitch.field);
+Glitch.packet_image = Image("effects/packet-loss.png").Scale(Glitch.field, Glitch.field);
+Glitch.mosh_image = Image("effects/data-mosh.png").Scale(Glitch.field, Glitch.field);
+Glitch.red_image = Image("effects/rgb-split-red.png").Scale(Glitch.field, Glitch.field);
+Glitch.white_image = Image("effects/rgb-split-white.png").Scale(Glitch.field, Glitch.field);
+Glitch.block_a = Image("effects/compression-blocks.png").Scale(Glitch.field, Glitch.field);
+Glitch.block_b = Image("effects/compression-blocks-02.png").Scale(Glitch.field, Glitch.field);
+
+Glitch.tear = Sprite(Glitch.tear_image);
+Glitch.offset = Sprite(Glitch.offset_image);
+Glitch.packet = Sprite(Glitch.packet_image);
+Glitch.mosh = Sprite(Glitch.mosh_image);
+Glitch.red = Sprite(Glitch.red_image);
+Glitch.white = Sprite(Glitch.white_image);
+Glitch.block = Sprite(Glitch.block_a);
+
+Glitch.block.SetZ(63);
+Glitch.packet.SetZ(64);
+Glitch.tear.SetZ(66);
+Glitch.offset.SetZ(67);
+Glitch.red.SetZ(68);
+Glitch.white.SetZ(69);
+Glitch.mosh.SetZ(70);
+
+Glitch.tear.SetOpacity(0);
+Glitch.offset.SetOpacity(0);
+Glitch.packet.SetOpacity(0);
+Glitch.mosh.SetOpacity(0);
+Glitch.red.SetOpacity(0);
+Glitch.white.SetOpacity(0);
+Glitch.block.SetOpacity(0);
+Glitch.block_state = 0;
+
+# Scanlines: one screen-wide strip repeated down the display. Scaling the 8x8
+# tile to the full screen would stretch two hairlines into two huge bands.
+Glitch.scan_on = 0;
+if (Config.film_grain > 0) {
+  Glitch.scan_on = 1;
+  Glitch.strip_h = Math.Int(24 * scale);
+  if (Glitch.strip_h < 8) Glitch.strip_h = 8;
+  Glitch.scan_image = Image("effects/scanlines.png").Scale(screen.w, Glitch.strip_h);
+  Glitch.scan_count = Math.Int(screen.h / Glitch.strip_h) + 1;
+  i = 0;
+  while (i < Glitch.scan_count) {
+    Glitch.scan[i] = Sprite(Glitch.scan_image);
+    Glitch.scan[i].SetZ(90);
+    Glitch.scan[i].SetX(0);
+    Glitch.scan[i].SetY(i * Glitch.strip_h);
+    Glitch.scan[i].SetOpacity(0);
+    i = i + 1;
+  }
+}
+
+# Lens falloff is radial, so it is the one layer that genuinely needs a
+# screen-sized image. Set vignette_opacity=0 to skip it entirely.
+Glitch.vignette_on = 0;
+if (Config.vignette_opacity > 0) {
+  Glitch.vignette_on = 1;
+  Glitch.vignette = Sprite(Image("effects/vignette.png").Scale(screen.w, screen.h));
+  Glitch.vignette.SetZ(89);
+  Glitch.vignette.SetOpacity(0);
+}
+
+# Written out rather than shared, so nothing depends on how the interpreter
+# passes an indexed object into a function. Each one skips its loop when the
+# level has not moved, which is most frames for the static and the mask.
+Glitch.noise_level = 0;
+Glitch.static_level = 0;
+Glitch.mask_level = 0;
+Glitch.scan_level = 0;
+
+fun Glitch.WashNoise(level) {
+  value = clamp(level, 0, 1);
+  if (Glitch.noise_level == value) return;
+  Glitch.noise_level = value;
+  i = 0;
+  while (i < Glitch.wash_count) {
+    Glitch.noise[i].SetOpacity(value);
+    i = i + 1;
+  }
+}
+
+fun Glitch.WashStatic(level) {
+  value = clamp(level, 0, 1);
+  if (Glitch.static_level == value) return;
+  Glitch.static_level = value;
+  i = 0;
+  while (i < Glitch.wash_count) {
+    Glitch.static[i].SetOpacity(value);
+    i = i + 1;
+  }
+}
+
+fun Glitch.WashMask(level) {
+  value = clamp(level, 0, 1);
+  if (Glitch.mask_level == value) return;
+  Glitch.mask_level = value;
+  i = 0;
+  while (i < Glitch.wash_count) {
+    Glitch.mask[i].SetOpacity(value);
+    i = i + 1;
+  }
+}
+
+fun Glitch.SetBlock(state) {
+  if (Glitch.block_state == state) return;
+  Glitch.block_state = state;
+  if (state == 1) Glitch.block.SetImage(Glitch.block_a);
+  if (state == 2) Glitch.block.SetImage(Glitch.block_b);
+}
+
+# The scanline stack is the largest sprite list in the theme and its level is
+# constant for most of the sequence, so the loop only runs on a change.
+fun Glitch.Scanlines(level) {
+  if (Glitch.scan_on == 0) return;
+  value = clamp(level, 0, 1);
+  if (Glitch.scan_level == value) return;
+  Glitch.scan_level = value;
+  i = 0;
+  while (i < Glitch.scan_count) {
+    Glitch.scan[i].SetOpacity(value);
+    i = i + 1;
+  }
+}
+
+fun Glitch.Hide() {
+  Glitch.WashNoise(0);
+  Glitch.WashStatic(0);
+  Glitch.WashMask(0);
+  Glitch.Scanlines(0);
+  Glitch.tear.SetOpacity(0);
+  Glitch.offset.SetOpacity(0);
+  Glitch.packet.SetOpacity(0);
+  Glitch.mosh.SetOpacity(0);
+  Glitch.red.SetOpacity(0);
+  Glitch.white.SetOpacity(0);
+  Glitch.block.SetOpacity(0);
+  if (Glitch.vignette_on) Glitch.vignette.SetOpacity(0);
+}
+
+fun Glitch.Update(t) {
+  if (t >= T.black_in) {
+    Glitch.Hide();
+    return;
+  }
+
+  g = Config.glitch_intensity;
+  tick = State.tick;
+  # Marks slide; the washes never do, because sliding a tiled layer would drag
+  # an uncovered strip in behind it.
+  slide = hash_sign(tick * 3) * 16 * scale;
+
+  # The system wakes: packet noise and acquisition marks.
+  acquire = ramp(t, T.acquire_in, T.acquire_in + 0.06)
+          * (1 - ramp(t, T.acquire_out - 0.25, T.acquire_out));
+  # The reticle sweeps: light tearing as the feed is pulled around.
+  sweep = ramp(t, T.scan_in, T.scan_in + 0.08)
+        * (1 - ramp(t, T.scan_out - 0.30, T.scan_out));
+  # The skull arrives as unstable fragments.
+  rebuild = ramp(t, T.skull_in, T.skull_in + 0.06)
+          * (1 - ramp(t, T.skull_formed - 0.35, T.skull_formed));
+  # The intrusion is noticed and the link degrades. Both of these have to fall
+  # away again before the watcher resolves, or the corruption they drive would
+  # sit on top of the last beat for a second and a half.
+  decay = ramp(t, T.corrupt_in, T.corrupt_out)
+        * (1 - ramp(t, T.lost_out, T.mosh_out));
+  # Data-mosh, packet loss, disintegration.
+  collapse = ramp(t, T.mosh_in, T.mosh_in + 0.12)
+           * (1 - ramp(t, T.watch_in, T.watch_in + 0.30));
+
+  # A single-frame hit that never stops entirely, so the feed always feels
+  # live rather than paused.
+  hit = 0;
+  if ((hash(tick) % 23) < 2) hit = 1;
+  strong = 0;
+  if ((hash(tick * 5) % 7) < 3) strong = 1;
+
+  # The noise wash doubles as the constant film grain: barely there while the
+  # trace is clean, climbing with every failure, and holding a low floor under
+  # the watcher so the last beat still feels like a live feed.
+  grain = Config.film_grain * 0.5 * ramp(t, T.acquire_in, T.scan_in);
+  if (t >= T.watch_in) grain = Config.film_grain * 0.8;
+  burst = acquire * 0.16 + rebuild * 0.30 + decay * 0.55 + collapse * 0.45;
+  Glitch.WashNoise(grain + (burst * 0.62 + hit * 0.12) * g);
+  Glitch.WashStatic((decay * 0.30 + collapse * 0.52) * hit * g);
+
+  Glitch.SetBlock(1 + (hash(tick * 7) % 2));
+  place(Glitch.block, Glitch.fx, Glitch.fy,
+        (rebuild * 0.5 + decay * 0.45) * strong * g);
+  place(Glitch.packet, Glitch.fx + slide, Glitch.fy,
+        (acquire * 0.55 + collapse * 0.7) * strong * g);
+  place(Glitch.tear, Glitch.fx + slide * 1.6, Glitch.fy,
+        (sweep * 0.55 + decay * 0.55) * strong * g);
+  place(Glitch.offset, Glitch.fx - slide * 1.2, Glitch.fy,
+        (sweep * 0.5 + decay * 0.4) * hit * g);
+
+  # Palette-safe channel split: red one way, white the other.
+  split = (decay * 0.55 + collapse * 0.45) * hit * g;
+  place(Glitch.red, Glitch.fx + 9 * scale, Glitch.fy, split * 0.8);
+  place(Glitch.white, Glitch.fx - 6 * scale, Glitch.fy, split * 0.6);
+
+  place(Glitch.mosh, Glitch.fx + slide * 0.8, Glitch.fy,
+        ramp(t, T.mosh_in, T.mosh_in + 0.1)
+        * (1 - ramp(t, T.watch_in, T.watch_in + 0.25)) * g * 0.85);
+
+  # Scanlines and lens falloff run all the way through the watcher: the last
+  # beat is still a monitor, not a photograph.
+  Glitch.Scanlines(Config.film_grain * (1 - ramp(t, T.black_in - 0.15, T.black_in)));
+  if (Glitch.vignette_on)
+    place(Glitch.vignette, 0, 0,
+          Config.vignette_opacity * ramp(t, T.acquire_in, T.scan_in)
+          * (1 - ramp(t, T.black_in - 0.20, T.black_in)));
+
+  # The terminal mask wipes the disintegrating subject, then pulls back so the
+  # watcher resolves up through it rather than being cut to.
+  Glitch.WashMask(ramp(t, T.mosh_in + 0.10, T.mosh_out - 0.20)
+                  * (1 - ramp(t, T.watch_in + 0.05, T.watch_in + 0.40)));
+}

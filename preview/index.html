@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Curruption Preview</title>
+  <link rel="stylesheet" href="preview.css">
+</head>
+<body>
+  <canvas id="boot" width="1920" height="1080" aria-label="Curruption animation preview"></canvas>
+  <div class="controls">
+    <button id="replay">Replay transmission</button>
+    <button id="toggle">Pause</button>
+    <input id="scrub" type="range" min="0" max="10" step="0.01" value="0"
+           aria-label="Scrub the timeline">
+    <span id="time">0.00 / 10.00</span>
+    <a href="assets.html">Asset library</a>
+  </div>
+  <p class="hint">space play/pause &middot; &larr; &rarr; step one frame &middot; r replay</p>
+  <script src="preview.js"></script>
+</body>
+</html>

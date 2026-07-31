@@ -1,0 +1,71 @@
+# Hyper-real gore skull using three complete photographic scream states.
+#
+# Full-frame switching avoids visible crop seams in natural bone and wet
+# tissue. The dangling eye remains present in every state; independent sway is
+# disabled for this master because no clean black crop corridor exists.
+
+# Dangling-eye column, re-derived from the hyper-real masters. The eyeball now
+# sits much closer to the cheek than it did in the flat concept, so the seam
+# only just clears bone (peak 87 of 255) and x 428..432 is the one margin that
+# is black in all three frames. Kept correct for the opt-in crop path even
+# though dangling_eye_enabled defaults to 0.
+Skull.SRC = 560;
+Skull.EYE_COL = 352;
+Skull.BULB_TOP = 352;
+Skull.BULB_RIGHT = 432;
+Skull.BULB_BOTTOM = 440;
+Skull.size = Math.Int(Skull.SRC * scale);
+Skull.unit = Skull.size / Skull.SRC;
+Skull.ox = Math.Int(screen.cx - Skull.size / 2);
+Skull.oy = Math.Int(screen.cy - Skull.size / 2);
+
+fun Skull.U(value) {
+  return Math.Int(value * Skull.unit);
+}
+
+Skull.frame_0 = Image("skull/scream-00.png").Scale(Skull.size, Skull.size);
+Skull.frame_1 = Image("skull/scream-01.png").Scale(Skull.size, Skull.size);
+Skull.frame_2 = Image("skull/scream-02.png").Scale(Skull.size, Skull.size);
+Skull.sprite = Sprite(Skull.frame_0);
+Skull.sprite.SetZ(10);
+Skull.sprite.SetOpacity(0);
+Skull.frame = 0;
+Skull.reveal = 0;
+Skull.jaw_offset = 0;
+Skull.x = Skull.ox;
+Skull.y = Skull.oy;
+Skull.gore = 1;
+
+fun Skull.SetFrame(index) {
+  if (Skull.frame == index) return;
+  Skull.frame = index;
+  if (index == 0) Skull.sprite.SetImage(Skull.frame_0);
+  if (index == 1) Skull.sprite.SetImage(Skull.frame_1);
+  if (index == 2) Skull.sprite.SetImage(Skull.frame_2);
+}
+
+fun Skull.Update(t) {
+  build = ease(ramp(t, T.skull_in, T.skull_formed));
+  reveal = ramp(t, T.skull_in, T.skull_in + 0.22);
+  # Fully gone before the watcher resolves: the two never share the screen.
+  reveal = reveal * (1 - ramp(t, T.mosh_in, T.watch_in));
+  if (t < T.skull_formed) reveal = reveal * flicker(State.tick, 3);
+  Skull.reveal = reveal;
+
+  unstable = (1 - build) * 26 * scale;
+  if (t > T.corrupt_in) unstable = ramp(t, T.corrupt_in, T.mosh_in) * 20 * scale;
+  State.jitter_prev = State.jitter;
+  State.jitter = 0;
+  if ((hash(State.tick) % 7) < 2) State.jitter = hash_sign(State.tick * 5) * unstable;
+
+  rise = (1 - build) * 22 * scale;
+  Skull.x = Skull.ox + State.jitter;
+  Skull.y = Skull.oy + rise;
+
+  frame = 0;
+  if (t >= T.jaw_in + 0.16) frame = 1;
+  if (t >= T.jaw_in + 0.42) frame = 2;
+  Skull.SetFrame(frame);
+
+  place(Skull.sprite, Skull.x, Skull.y, reveal);
+}

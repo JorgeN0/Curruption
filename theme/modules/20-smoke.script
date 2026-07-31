@@ -1,0 +1,42 @@
+# Background atmosphere. Two counter-drifting layers, always behind the
+# subject and always below 25% opacity so the skull is never obscured.
+
+Smoke.enabled = 1;
+if (Config.smoke_density <= 0) Smoke.enabled = 0;
+
+if (Smoke.enabled) {
+  # The artwork fades to zero alpha well inside its own edges, so it can stay
+  # smaller than the screen without showing a boundary.
+  Smoke.size = Math.Int(1000 * scale);
+  Smoke.a_image = Image("effects/smoke.png").Scale(Smoke.size, Smoke.size);
+  Smoke.b_image = Image("effects/smoke-02.png").Scale(Smoke.size, Smoke.size);
+  Smoke.a = Sprite(Smoke.a_image);
+  Smoke.b = Sprite(Smoke.b_image);
+  Smoke.a.SetZ(-80);
+  Smoke.b.SetZ(-79);
+  Smoke.a.SetOpacity(0);
+  Smoke.b.SetOpacity(0);
+  Smoke.home_x = screen.cx - Smoke.size / 2;
+  Smoke.home_y = screen.cy - Smoke.size / 2;
+}
+
+# Hard ceiling regardless of configuration: atmosphere must stay atmosphere.
+Smoke.ceiling = 0.24;
+
+fun Smoke.Update(t) {
+  if (Smoke.enabled == 0) return;
+  density = Config.smoke_density;
+  if (density > Smoke.ceiling) density = Smoke.ceiling;
+  # Present from the moment the system wakes until the feed collapses. The
+  # watcher at the end gets a clean black field to itself.
+  level = ramp(t, T.acquire_in, T.skull_in) * density;
+  level = level * (1 - ramp(t, T.mosh_in, T.watch_in));
+  place(Smoke.a,
+        Smoke.home_x + Math.Sin(t * 0.16) * 26 * scale,
+        Smoke.home_y + Math.Sin(t * 0.11) * 15 * scale,
+        level);
+  place(Smoke.b,
+        Smoke.home_x - Math.Sin(t * 0.13 + 1.7) * 21 * scale,
+        Smoke.home_y - Math.Sin(t * 0.09 + 0.6) * 12 * scale,
+        level * 0.62);
+}

@@ -1,0 +1,178 @@
+# Shared clock, geometry, layout anchors, and deterministic helpers.
+#
+# Nothing here allocates images. Every system preloads and scales its own
+# artwork once at load time and only moves sprites inside the refresh
+# callback, which is what keeps the sequence cheap enough for early boot.
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+screen.w = Window.GetWidth();
+screen.h = Window.GetHeight();
+screen.cx = screen.w / 2;
+screen.cy = screen.h / 2;
+
+# One uniform scale against the 1920x1080 reference layout. The composition is
+# never stretched, so portrait and ultrawide panels letterbox instead of
+# distorting the skull.
+scale = screen.h / 1080;
+if (screen.w / 1920 < scale) scale = screen.w / 1920;
+if (scale < 0.30) scale = 0.30;
+
+# HUD anchors are screen fractions rather than offsets from a fixed 1920x1080
+# box, so telemetry stays on screen at 1366x768 and at 2560x1440 alike.
+layout.left = screen.w * 0.055;
+layout.right = screen.w - screen.w * 0.055;
+layout.top = screen.h * 0.075;
+layout.bottom = screen.h - screen.h * 0.075;
+
+# Monospace only, sized in three steps so text stays legible from 1366x768 up
+# to 2560x1440 without ever being rasterised at one size and scaled to another.
+#
+# Three weights, not one. The HUD text is the attacker's readout and stays
+# subordinate to the subject; the two story beats are the sequence talking to
+# the viewer and are set large and bold. Neither ever competes with the skull
+# for the centre of the frame — they sit above and below it.
+ui_font = "Monospace 16";
+story_font = "Monospace Bold 26";
+watch_font = "Monospace Bold 32";
+if (scale > 0.72) {
+  ui_font = "Monospace 21";
+  story_font = "Monospace Bold 34";
+  watch_font = "Monospace Bold 42";
+}
+if (scale > 1.15) {
+  ui_font = "Monospace 27";
+  story_font = "Monospace Bold 44";
+  watch_font = "Monospace Bold 54";
+}
+
+State.tick = 0;
+State.elapsed = 0;
+State.progress = 0;
+State.quitting = 0;
+State.jitter = 0;
+State.jitter_prev = 0;
+
+# Canonical timeline in seconds. docs/TIMING.md mirrors this table exactly;
+# change both together.
+#
+# The arc is an intrusion, not a title card: something traces the machine,
+# finds a subject, confirms it, gets caught, loses the link, and is still
+# there afterwards. The watcher is deliberately held back to the very end so
+# the reveal lands as a reversal rather than as an introduction.
+# The opening runs fast on purpose. A trace that takes its time is a loading
+# screen; one that finds you in a second is an intrusion. Everything the
+# opening gave up is spent at the other end, where the watcher holds.
+T.black_out    = 0.22;   # complete black before anything is drawn
+T.acquire_in   = 0.22;   # the system wakes: grid, telemetry, packet noise
+T.acquire_out  = 1.30;
+T.trace_in     = 0.32;   # TRACE INITIATED
+T.trace_out    = 0.92;
+T.scan_in      = 0.50;   # reticle sweeps looking for a subject
+T.scan_out     = 1.50;
+T.subject_in   = 0.95;   # SUBJECT ACQUIRED
+T.subject_out  = 1.55;
+T.skull_in     = 1.10;   # gore skull reconstructs from fragments
+T.skull_formed = 2.20;
+T.link_in      = 1.90;   # VISUAL LINK ESTABLISHED
+T.link_out     = 3.10;
+T.lock_in      = 3.30;   # brackets tighten, TARGET LOCKED
+T.lock_out     = 4.60;
+T.sway_in      = 4.00;   # dangling eyeball begins a heavy sway
+T.sway_full    = 5.00;
+T.jaw_in       = 4.60;   # jaw opens with slow weight
+T.jaw_out      = 5.90;
+T.match_in     = 4.75;   # BIOMETRIC MATCH
+T.match_out    = 5.55;
+T.ignite_in    = 5.30;   # red ignition, empty socket only, hard on/off
+T.corrupt_in   = 5.90;   # the intrusion is noticed and the link degrades
+T.corrupt_out  = 6.70;
+T.breach_in    = 5.95;   # CONNECTION COMPROMISED
+T.breach_out   = 6.55;
+T.lost_in      = 6.60;   # SIGNAL LOST
+T.lost_out     = 7.20;
+T.mosh_in      = 7.00;   # data-mosh, packet loss, disintegration
+T.mosh_out     = 7.70;
+T.watch_in     = 7.55;   # the watcher resolves out of the static
+T.watch_text   = 7.95;   # BIG BROTHER IS WATCHING
+T.watch_out    = 9.70;   # ...and holds. This is the beat that matters.
+T.black_in     = 9.70;   # total black for the display-manager handoff
+T.end          = 10.00;
+
+fun clamp(value, low, high) {
+  if (value < low) return low;
+  if (value > high) return high;
+  return value;
+}
+
+fun abs(value) {
+  if (value < 0) return 0 - value;
+  return value;
+}
+
+# Linear 0..1 across [a, b], clamped outside it.
+fun ramp(now, a, b) {
+  if (b <= a) {
+    if (now < a) return 0;
+    return 1;
+  }
+  return clamp((now - a) / (b - a), 0, 1);
+}
+
+# 1 inside [a, b), 0 outside. Used for the hard on/off states.
+fun hold(now, a, b) {
+  if (now >= a && now < b) return 1;
+  return 0;
+}
+
+# Smoothstep, for anything that should feel weighted rather than mechanical.
+fun ease(value) {
+  v = clamp(value, 0, 1);
+  return v * v * (3 - 2 * v);
+}
+
+fun pulse(start, attack, sustain, release, now) {
+  if (now < start) return 0;
+  if (now < start + attack) return (now - start) / attack;
+  if (now < start + attack + sustain) return 1;
+  if (now < start + attack + sustain + release)
+    return 1 - ((now - start - attack - sustain) / release);
+  return 0;
+}
+
+# Deterministic integer hash. Small multipliers keep every intermediate value
+# inside the exact range of a double, so the same seed always produces the
+# same corruption on every machine.
+fun hash(n) {
+  h = ((n + Config.random_seed) * 71) % 991;
+  h = (h * 113 + n * 29) % 1009;
+  if (h < 0) return 0 - h;
+  return h;
+}
+
+fun hash01(n) {
+  return hash(n) / 1009;
+}
+
+# -1, 0 or 1, for deterministic horizontal displacement.
+fun hash_sign(n) {
+  return (hash(n) % 3) - 1;
+}
+
+fun flicker(n, salt) {
+  if ((hash(n * 7 + salt) % 19) < 3) return 0.22;
+  return 1;
+}
+
+# Position and reveal in one call. Sprites below the visibility threshold are
+# only hidden, never repositioned, so off-screen systems cost nothing.
+fun place(sprite, x, y, opacity) {
+  if (opacity <= 0.004) {
+    sprite.SetOpacity(0);
+    return;
+  }
+  sprite.SetX(x);
+  sprite.SetY(y);
+  sprite.SetOpacity(clamp(opacity, 0, 1));
+}
