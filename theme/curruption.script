@@ -8,6 +8,7 @@
 Config.animation_duration = 10.0;
 Config.animation_speed = 1.0;
 Config.refresh_rate = 30;
+Config.compat_profile = 0;
 Config.gore_enabled = 1;
 Config.jaw_open_distance = 42;
 Config.blood_overlay_opacity = 1.0;
@@ -83,6 +84,18 @@ if (scale > 1.15) {
   ui_font = "Monospace 27";
   story_font = "Monospace Bold 44";
   watch_font = "Monospace Bold 54";
+}
+
+# Compatibility fallback profile for stricter/older Plymouth builds.
+# 0 = full feature path.
+# 1 = no SetRefreshRate request and no explicit font argument in Image.Text.
+Compat.profile = Config.compat_profile;
+Compat.fallback = 0;
+if (Compat.profile >= 1) Compat.fallback = 1;
+
+fun text_image(text, r, g, b, a, font_name) {
+  if (Compat.fallback) return Image.Text(text, r, g, b, a);
+  return Image.Text(text, r, g, b, a, font_name);
 }
 
 State.tick = 0;
@@ -591,12 +604,12 @@ if (Hud.on) {
   Hud.bars_4 = Image("hud/signal-bars-4.png").Scale(Skull.U(180), Skull.U(48));
   Hud.bars_5 = Image("hud/signal-bars-5.png").Scale(Skull.U(180), Skull.U(48));
 
-  Hud.text_trace = Image.Text("TRACE INITIATED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_subject = Image.Text("SUBJECT ACQUIRED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_link = Image.Text("VISUAL LINK ESTABLISHED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_lock = Image.Text("TARGET LOCKED", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_match = Image.Text("BIOMETRIC MATCH", 0.86, 0.86, 0.86, 1, ui_font);
-  Hud.text_breach = Image.Text("CONNECTION COMPROMISED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_trace = text_image("TRACE INITIATED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_subject = text_image("SUBJECT ACQUIRED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_link = text_image("VISUAL LINK ESTABLISHED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_lock = text_image("TARGET LOCKED", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_match = text_image("BIOMETRIC MATCH", 0.86, 0.86, 0.86, 1, ui_font);
+  Hud.text_breach = text_image("CONNECTION COMPROMISED", 0.86, 0.86, 0.86, 1, ui_font);
 
   Hud.grid = Sprite(Hud.grid_image);
   Hud.brackets = Sprite(Hud.bracket_sweep);
@@ -1120,7 +1133,7 @@ fun Glitch.Update(t) {
 # requested below, and the value can be corrected in config/theme.conf if a
 # particular Plymouth build ignores it.
 
-Plymouth.SetRefreshRate(Config.refresh_rate);
+if (Compat.fallback == 0) Plymouth.SetRefreshRate(Config.refresh_rate);
 
 # The two beats that are the story rather than the interface, so they are
 # independent of hud_enabled.
@@ -1129,13 +1142,13 @@ Plymouth.SetRefreshRate(Config.refresh_rate);
 # further slows the eye down and stops the words reading as a status line. It
 # is the cheapest way to make short text feel deliberate rather than logged,
 # and Plymouth gives no tracking control otherwise.
-Failure.text = Image.Text("S I G N A L   L O S T", 0.92, 0.92, 0.92, 1, story_font);
+Failure.text = text_image("S I G N A L   L O S T", 0.92, 0.92, 0.92, 1, story_font);
 Failure.label = Sprite(Failure.text);
 Failure.label.SetZ(98);
 Failure.label.SetOpacity(0);
 Failure.w = Failure.text.GetWidth();
 
-Watching.text = Image.Text("B I G   B R O T H E R   I S   W A T C H I N G",
+Watching.text = text_image("B I G   B R O T H E R   I S   W A T C H I N G",
                            1.0, 1.0, 1.0, 1, watch_font);
 Watching.label = Sprite(Watching.text);
 Watching.label.SetZ(99);
@@ -1248,7 +1261,7 @@ fun Curruption.DisplayPassword(prompt, bullets) {
   State.blanked = 0;
   label = prompt;
   if (label == "") label = "ENTER PASSPHRASE";
-  image = Image.Text(label + "   " + Curruption.Bullets(bullets),
+  image = text_image(label + "   " + Curruption.Bullets(bullets),
                      0.9, 0.9, 0.9, 1, ui_font);
   Mode.prompt.SetImage(image);
   Mode.prompt.SetX(screen.cx - image.GetWidth() / 2);
@@ -1260,7 +1273,7 @@ fun Curruption.DisplayQuestion(prompt, entry) {
   local.image;
   Mode.current = 2;
   State.blanked = 0;
-  image = Image.Text(prompt + "   " + entry, 0.9, 0.9, 0.9, 1, ui_font);
+  image = text_image(prompt + "   " + entry, 0.9, 0.9, 0.9, 1, ui_font);
   Mode.prompt.SetImage(image);
   Mode.prompt.SetX(screen.cx - image.GetWidth() / 2);
   Mode.prompt.SetY(screen.cy - image.GetHeight() / 2);
@@ -1276,7 +1289,7 @@ fun Curruption.DisplayNormal() {
 
 fun Curruption.Message(text) {
   local.image;
-  image = Image.Text(text, 0.72, 0.72, 0.72, 1, ui_font);
+  image = text_image(text, 0.72, 0.72, 0.72, 1, ui_font);
   Mode.message.SetImage(image);
   Mode.message.SetX(screen.cx - image.GetWidth() / 2);
   Mode.message.SetY(layout.bottom - image.GetHeight());
