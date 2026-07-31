@@ -53,6 +53,9 @@ fun BigBrother.Update(t) {
     return;
   }
 
+  local.state;
+  local.level;
+
   # Offsets from watch_in rather than absolute times, so retiming the sequence
   # cannot leave the resolve stranded behind the beat it belongs to.
   state = 1;

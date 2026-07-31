@@ -133,6 +133,8 @@ Glitch.mask_level = 0;
 Glitch.scan_level = 0;
 
 fun Glitch.WashNoise(level) {
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.noise_level == value) return;
   Glitch.noise_level = value;
@@ -144,6 +146,8 @@ fun Glitch.WashNoise(level) {
 }
 
 fun Glitch.WashStatic(level) {
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.static_level == value) return;
   Glitch.static_level = value;
@@ -155,6 +159,8 @@ fun Glitch.WashStatic(level) {
 }
 
 fun Glitch.WashMask(level) {
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.mask_level == value) return;
   Glitch.mask_level = value;
@@ -176,6 +182,8 @@ fun Glitch.SetBlock(state) {
 # constant for most of the sequence, so the loop only runs on a change.
 fun Glitch.Scanlines(level) {
   if (Glitch.scan_on == 0) return;
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.scan_level == value) return;
   Glitch.scan_level = value;
@@ -206,6 +214,20 @@ fun Glitch.Update(t) {
     Glitch.Hide();
     return;
   }
+
+  local.g;
+  local.tick;
+  local.slide;
+  local.acquire;
+  local.sweep;
+  local.rebuild;
+  local.decay;
+  local.collapse;
+  local.hit;
+  local.strong;
+  local.grain;
+  local.burst;
+  local.split;
 
   g = Config.glitch_intensity;
   tick = State.tick;

@@ -32,6 +32,15 @@ Config.random_seed = 31991;
 # Nothing here allocates images. Every system preloads and scales its own
 # artwork once at load time and only moves sprites inside the refresh
 # callback, which is what keeps the sequence cheap enough for early boot.
+#
+# Plymouth's script language has no automatic function-local scoping: a bare
+# `x = 1;` assigned inside a `fun` is a write to the GLOBAL `x`, shared by
+# every function in the compiled script, unless the function first declares
+# `local.x;`. build.py concatenates all ten modules into one script, so a
+# temp variable named e.g. `level` in one module's Update() is the same
+# storage as a same-named `level` temp in every other module's Update().
+# Every function below that assigns a bare scratch variable declares it
+# `local.` first, matching the pattern used by Plymouth's own themes.
 
 Window.SetBackgroundTopColor(0, 0, 0);
 Window.SetBackgroundBottomColor(0, 0, 0);
@@ -157,6 +166,7 @@ fun hold(now, a, b) {
 
 # Smoothstep, for anything that should feel weighted rather than mechanical.
 fun ease(value) {
+  local.v;
   v = clamp(value, 0, 1);
   return v * v * (3 - 2 * v);
 }
@@ -174,6 +184,7 @@ fun pulse(start, attack, sustain, release, now) {
 # inside the exact range of a double, so the same seed always produces the
 # same corruption on every machine.
 fun hash(n) {
+  local.h;
   h = ((n + Config.random_seed) * 71) % 991;
   h = (h * 113 + n * 29) % 1009;
   if (h < 0) return 0 - h;
@@ -234,6 +245,8 @@ Smoke.ceiling = 0.24;
 
 fun Smoke.Update(t) {
   if (Smoke.enabled == 0) return;
+  local.density;
+  local.level;
   density = Config.smoke_density;
   if (density > Smoke.ceiling) density = Smoke.ceiling;
   # Present from the moment the system wakes until the feed collapses. The
@@ -298,6 +311,11 @@ fun Skull.SetFrame(index) {
 }
 
 fun Skull.Update(t) {
+  local.build;
+  local.reveal;
+  local.unstable;
+  local.rise;
+  local.frame;
   build = ease(ramp(t, T.skull_in, T.skull_formed));
   reveal = ramp(t, T.skull_in, T.skull_in + 0.22);
   # Fully gone before the watcher resolves: the two never share the screen.
@@ -394,6 +412,11 @@ fun DanglingEye.Update(t) {
   }
   DanglingEye.SetFrame(Skull.frame);
 
+  local.amp;
+  local.phase;
+  local.swing;
+  local.drag;
+
   # Almost still at first, then a slow build to a heavy sway that never
   # entirely settles.
   amp = ease(ramp(t, T.sway_in, T.sway_full)) * 0.86;
@@ -445,6 +468,7 @@ Eyes.glow.SetOpacity(0);
 Eyes.core.SetOpacity(0);
 
 fun Eyes.Update(t) {
+  local.lit;
   lit = hold(t, T.ignite_in, T.ignite_in + Config.eye_duration);
   place(Eyes.glow, Skull.x + Eyes.dx, Skull.y + Eyes.dy, lit * 0.85);
   place(Eyes.core, Skull.x + Eyes.dx, Skull.y + Eyes.dy, lit);
@@ -505,6 +529,9 @@ fun BigBrother.Update(t) {
     BigBrother.sprite.SetOpacity(0);
     return;
   }
+
+  local.state;
+  local.level;
 
   # Offsets from watch_in rather than absolute times, so retiming the sequence
   # cannot leave the resolve stranded behind the beat it belongs to.
@@ -679,6 +706,17 @@ fun Hud.SetLabel(state) {
 
 fun Hud.Update(t) {
   if (Hud.on == 0) return;
+  local.live;
+  local.state;
+  local.size;
+  local.frame_show;
+  local.cross;
+  local.cross_x;
+  local.sweep;
+  local.step;
+  local.lock_show;
+  local.level;
+  local.label;
 
   # Global HUD presence: up with the trace, and torn down when the link dies.
   # None of it survives into the watcher's frame — by then the attacker's
@@ -904,6 +942,8 @@ Glitch.mask_level = 0;
 Glitch.scan_level = 0;
 
 fun Glitch.WashNoise(level) {
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.noise_level == value) return;
   Glitch.noise_level = value;
@@ -915,6 +955,8 @@ fun Glitch.WashNoise(level) {
 }
 
 fun Glitch.WashStatic(level) {
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.static_level == value) return;
   Glitch.static_level = value;
@@ -926,6 +968,8 @@ fun Glitch.WashStatic(level) {
 }
 
 fun Glitch.WashMask(level) {
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.mask_level == value) return;
   Glitch.mask_level = value;
@@ -947,6 +991,8 @@ fun Glitch.SetBlock(state) {
 # constant for most of the sequence, so the loop only runs on a change.
 fun Glitch.Scanlines(level) {
   if (Glitch.scan_on == 0) return;
+  local.value;
+  local.i;
   value = clamp(level, 0, 1);
   if (Glitch.scan_level == value) return;
   Glitch.scan_level = value;
@@ -977,6 +1023,20 @@ fun Glitch.Update(t) {
     Glitch.Hide();
     return;
   }
+
+  local.g;
+  local.tick;
+  local.slide;
+  local.acquire;
+  local.sweep;
+  local.rebuild;
+  local.decay;
+  local.collapse;
+  local.hit;
+  local.strong;
+  local.grain;
+  local.burst;
+  local.split;
 
   g = Config.glitch_intensity;
   tick = State.tick;
@@ -1097,6 +1157,9 @@ State.finished = 0;
 State.blanked = 0;
 
 fun Curruption.Draw(t) {
+  local.lost;
+  local.watching;
+
   Smoke.Update(t);
   BigBrother.Update(t);
   Skull.Update(t);
@@ -1127,6 +1190,7 @@ fun Curruption.Blank() {
 }
 
 fun Curruption.Refresh() {
+  local.t;
   State.tick = State.tick + 1;
 
   if (Mode.current != 0) {
@@ -1161,6 +1225,9 @@ fun Curruption.BootProgress(duration, progress) {
 }
 
 fun Curruption.Bullets(count) {
+  local.text;
+  local.n;
+  local.i;
   text = "";
   n = count;
   if (n > 32) n = 32;
@@ -1175,6 +1242,8 @@ fun Curruption.Bullets(count) {
 # Disk unlock and any other prompt must be readable, so the sequence yields
 # the screen rather than competing with it.
 fun Curruption.DisplayPassword(prompt, bullets) {
+  local.label;
+  local.image;
   Mode.current = 1;
   State.blanked = 0;
   label = prompt;
@@ -1188,6 +1257,7 @@ fun Curruption.DisplayPassword(prompt, bullets) {
 }
 
 fun Curruption.DisplayQuestion(prompt, entry) {
+  local.image;
   Mode.current = 2;
   State.blanked = 0;
   image = Image.Text(prompt + "   " + entry, 0.9, 0.9, 0.9, 1, ui_font);
@@ -1205,6 +1275,7 @@ fun Curruption.DisplayNormal() {
 }
 
 fun Curruption.Message(text) {
+  local.image;
   image = Image.Text(text, 0.72, 0.72, 0.72, 1, ui_font);
   Mode.message.SetImage(image);
   Mode.message.SetX(screen.cx - image.GetWidth() / 2);
@@ -1228,6 +1299,6 @@ Plymouth.SetBootProgressFunction(Curruption.BootProgress);
 Plymouth.SetDisplayPasswordFunction(Curruption.DisplayPassword);
 Plymouth.SetDisplayQuestionFunction(Curruption.DisplayQuestion);
 Plymouth.SetDisplayNormalFunction(Curruption.DisplayNormal);
-Plymouth.SetMessageFunction(Curruption.Message);
+Plymouth.SetDisplayMessageFunction(Curruption.Message);
 Plymouth.SetHideMessageFunction(Curruption.HideMessage);
 Plymouth.SetQuitFunction(Curruption.Quit);

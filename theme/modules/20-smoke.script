@@ -25,6 +25,8 @@ Smoke.ceiling = 0.24;
 
 fun Smoke.Update(t) {
   if (Smoke.enabled == 0) return;
+  local.density;
+  local.level;
   density = Config.smoke_density;
   if (density > Smoke.ceiling) density = Smoke.ceiling;
   # Present from the moment the system wakes until the feed collapses. The

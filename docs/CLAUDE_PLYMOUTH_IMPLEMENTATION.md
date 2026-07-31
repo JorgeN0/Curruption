@@ -495,28 +495,26 @@ that, and enforces that the approved source still matches concept 06.
 
 No new asset files were created or modified.
 
-## The dangling eye is a runtime cut
+## The dangling eye is a runtime cut, off by default
 
 Three keyframes lock the eyeball to the jaw, and the brief requires the two to
-animate independently. The runtime therefore cuts the x 350–412 / y 364–460
-column out of whichever frame is live and re-lays it a few pixels inboard.
-That column holds the bulb, its downward iris and the lower optic nerve; the
-upper nerve stays anchored in the socket, so the two read as one attached
-system flexing where the bulb hangs. The tile is never rotated, so the iris
-stays aimed downward through the whole swing.
-
-Travel is inboard only and clamped to four master pixels, because x 408–412 is
-the only margin that is black in all three frames. Sliding outward, or
-further, would uncover the bulb's own edge and tear it.
-`scripts/validate_assets.py` re-checks both facts against the artwork, so a
-future asset change cannot silently break the cut.
+animate independently. The runtime can cut a column out of whichever frame is
+live and re-lay it a few pixels inboard, so it flexes independently of the
+jaw while the tile stays unrotated and the iris stays aimed downward. On the
+hyper-real artwork this column is x 352–432 / y 352–440, re-derived after the
+production art replaced the flat concept — the eyeball there sits close enough
+to the cheek that the crop seam only just clears bone. `dangling_eye_enabled`
+defaults to 0 for that reason: the three authored frames already move the
+eyeball on their own, and the crop is an opt-in for a wider swing rather than
+the default. `scripts/validate_assets.py` re-checks the seam and margin
+against the artwork whenever it is enabled.
 
 ## Module layout
 
-`35-dangling-eye.script` was added as suggested. `25-bigbrother.script` was
-also added, because the brief lists the Big Brother feed as its own
-responsibility and folding it into the HUD or the skull module would have
-mixed two systems.
+`35-dangling-eye.script` was added as suggested. `45-bigbrother.script` was
+also added — under that later number, not `25-`, because the brief's "Big
+Brother eye" beat was redirected mid-project from an opening interception to
+the closing watcher, so it now loads after the systems it appears on top of.
 
 ## Corruption is split in two
 
@@ -531,19 +529,63 @@ Scanlines are a third case: periodic in y, uniform in x, so one screen-wide
 strip stacked down the display is exact. Scaling the 8x8 tile to the full
 screen, as the previous runtime did, stretched two hairlines into two bands.
 
+## Plymouth script has no function-local scoping — this was a real bug
+
+Cross-checked against Plymouth's own bundled `themes/script/script.script`
+(canonical, ships with Plymouth) and a live Arch theme
+(`jtyr/plymouth-theme-arch-breeze`): a bare `x = 1;` assigned inside a `fun`
+writes the **global** `x`. Function-local scoping only exists via an explicit
+`local.x;` declaration before first use — the reference script demonstrates
+this exact pattern (`local.box; local.lock; local.entry;` before using them as
+bare names for the rest of that function).
+
+`scripts/build.py` concatenates all ten modules into one script. Every module
+was originally written with bare scratch variables — `level`, `state`,
+`frame`, `size`, and so on — on the assumption that a `fun` body gets its own
+scope, which Plymouth's language does not provide. Concatenated, a same-named
+scratch variable in two different modules' `Update()` functions is the same
+global storage. In this codebase every affected read happened to be preceded
+by a write in the same call, so nothing was visibly broken by it, but that was
+incidental, not designed, and a future edit could easily have broken it
+silently with no error message on a real boot.
+
+Fixed by declaring every function-body scratch variable `local.` in all ten
+modules — 43 functions checked, matched against parameter lists so real
+parameters (which are correctly call-scoped without any declaration) weren't
+mistakenly re-declared. Verified two ways: a script that parses every `fun`
+block and confirms no bare assignment lacks either a parameter binding or a
+preceding `local.` declaration, and a structural brace/paren/bracket balance
+check on the rebuilt `theme/curruption.script`. Both pass clean.
+
+Also fixed while cross-checking the canonical reference:
+`Plymouth.SetMessageFunction` is not a real registration function —
+`Plymouth.SetDisplayMessageFunction` is the name Plymouth's own script theme
+uses. (The Arch Breeze theme referenced above uses the wrong name too, for
+whatever that's worth; it evidently doesn't hard-fail the theme load, but the
+confirmed-correct name is used here.)
+
 ## Not verified
 
 **The theme has not been run under Plymouth on Linux.** It was developed on
 Windows. Structure, geometry, asset references and timing were verified
-offline, and the composition was checked by replicating the module maths in a
-throwaway renderer, but no claim is made about Plymouth behaviour.
+offline, the composition was checked by replicating the module maths in a
+throwaway renderer, and the script language usage was cross-checked against
+Plymouth's own bundled reference theme and a live Arch theme — but no claim is
+made about actual Plymouth behaviour, because none of that is the same as
+running it.
 
-Three things need checking on a real Linux boot before this is called done:
+Things worth checking on a real Linux boot before this is called done:
 
 - `Image.Crop`, `Plymouth.SetRefreshRate` and the `font` argument to
-  `Image.Text` are all used. If a Plymouth build lacks the first,
+  `Image.Text` are all used and all confirmed to exist in Plymouth's script
+  language, but confirmation came from documentation and reference themes, not
+  from executing this script. If a particular Plymouth build lacks `Crop`,
   `gore_enabled=0` in `config/theme.conf` is the documented fallback.
 - the clock counts refresh ticks and divides by `refresh_rate`. If a build
   ignores `SetRefreshRate`, the sequence runs fast or slow until that setting
   is corrected to the rate the build actually uses.
 - resolution testing at 1920x1080, 1366x768, 2560x1440 and one portrait panel.
+- whether `local.` declarations are accepted by every Plymouth version in the
+  wild, not just the one the reference theme was written against. The syntax
+  is confirmed from Plymouth's own upstream example, which is the strongest
+  evidence available without a real boot, but it is evidence, not a test.

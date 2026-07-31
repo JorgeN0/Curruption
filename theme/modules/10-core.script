@@ -3,6 +3,15 @@
 # Nothing here allocates images. Every system preloads and scales its own
 # artwork once at load time and only moves sprites inside the refresh
 # callback, which is what keeps the sequence cheap enough for early boot.
+#
+# Plymouth's script language has no automatic function-local scoping: a bare
+# `x = 1;` assigned inside a `fun` is a write to the GLOBAL `x`, shared by
+# every function in the compiled script, unless the function first declares
+# `local.x;`. build.py concatenates all ten modules into one script, so a
+# temp variable named e.g. `level` in one module's Update() is the same
+# storage as a same-named `level` temp in every other module's Update().
+# Every function below that assigns a bare scratch variable declares it
+# `local.` first, matching the pattern used by Plymouth's own themes.
 
 Window.SetBackgroundTopColor(0, 0, 0);
 Window.SetBackgroundBottomColor(0, 0, 0);
@@ -128,6 +137,7 @@ fun hold(now, a, b) {
 
 # Smoothstep, for anything that should feel weighted rather than mechanical.
 fun ease(value) {
+  local.v;
   v = clamp(value, 0, 1);
   return v * v * (3 - 2 * v);
 }
@@ -145,6 +155,7 @@ fun pulse(start, attack, sustain, release, now) {
 # inside the exact range of a double, so the same seed always produces the
 # same corruption on every machine.
 fun hash(n) {
+  local.h;
   h = ((n + Config.random_seed) * 71) % 991;
   h = (h * 113 + n * 29) % 1009;
   if (h < 0) return 0 - h;

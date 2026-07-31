@@ -68,6 +68,11 @@ fun DanglingEye.Update(t) {
   }
   DanglingEye.SetFrame(Skull.frame);
 
+  local.amp;
+  local.phase;
+  local.swing;
+  local.drag;
+
   # Almost still at first, then a slow build to a heavy sway that never
   # entirely settles.
   amp = ease(ramp(t, T.sway_in, T.sway_full)) * 0.86;

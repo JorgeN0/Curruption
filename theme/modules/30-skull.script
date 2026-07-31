@@ -45,6 +45,11 @@ fun Skull.SetFrame(index) {
 }
 
 fun Skull.Update(t) {
+  local.build;
+  local.reveal;
+  local.unstable;
+  local.rise;
+  local.frame;
   build = ease(ramp(t, T.skull_in, T.skull_formed));
   reveal = ramp(t, T.skull_in, T.skull_in + 0.22);
   # Fully gone before the watcher resolves: the two never share the screen.

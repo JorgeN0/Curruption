@@ -153,6 +153,17 @@ fun Hud.SetLabel(state) {
 
 fun Hud.Update(t) {
   if (Hud.on == 0) return;
+  local.live;
+  local.state;
+  local.size;
+  local.frame_show;
+  local.cross;
+  local.cross_x;
+  local.sweep;
+  local.step;
+  local.lock_show;
+  local.level;
+  local.label;
 
   # Global HUD presence: up with the trace, and torn down when the link dies.
   # None of it survives into the watcher's frame — by then the attacker's

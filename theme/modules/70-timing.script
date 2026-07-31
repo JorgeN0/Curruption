@@ -43,6 +43,9 @@ State.finished = 0;
 State.blanked = 0;
 
 fun Curruption.Draw(t) {
+  local.lost;
+  local.watching;
+
   Smoke.Update(t);
   BigBrother.Update(t);
   Skull.Update(t);
@@ -73,6 +76,7 @@ fun Curruption.Blank() {
 }
 
 fun Curruption.Refresh() {
+  local.t;
   State.tick = State.tick + 1;
 
   if (Mode.current != 0) {
@@ -107,6 +111,9 @@ fun Curruption.BootProgress(duration, progress) {
 }
 
 fun Curruption.Bullets(count) {
+  local.text;
+  local.n;
+  local.i;
   text = "";
   n = count;
   if (n > 32) n = 32;
@@ -121,6 +128,8 @@ fun Curruption.Bullets(count) {
 # Disk unlock and any other prompt must be readable, so the sequence yields
 # the screen rather than competing with it.
 fun Curruption.DisplayPassword(prompt, bullets) {
+  local.label;
+  local.image;
   Mode.current = 1;
   State.blanked = 0;
   label = prompt;
@@ -134,6 +143,7 @@ fun Curruption.DisplayPassword(prompt, bullets) {
 }
 
 fun Curruption.DisplayQuestion(prompt, entry) {
+  local.image;
   Mode.current = 2;
   State.blanked = 0;
   image = Image.Text(prompt + "   " + entry, 0.9, 0.9, 0.9, 1, ui_font);
@@ -151,6 +161,7 @@ fun Curruption.DisplayNormal() {
 }
 
 fun Curruption.Message(text) {
+  local.image;
   image = Image.Text(text, 0.72, 0.72, 0.72, 1, ui_font);
   Mode.message.SetImage(image);
   Mode.message.SetX(screen.cx - image.GetWidth() / 2);
@@ -174,6 +185,6 @@ Plymouth.SetBootProgressFunction(Curruption.BootProgress);
 Plymouth.SetDisplayPasswordFunction(Curruption.DisplayPassword);
 Plymouth.SetDisplayQuestionFunction(Curruption.DisplayQuestion);
 Plymouth.SetDisplayNormalFunction(Curruption.DisplayNormal);
-Plymouth.SetMessageFunction(Curruption.Message);
+Plymouth.SetDisplayMessageFunction(Curruption.Message);
 Plymouth.SetHideMessageFunction(Curruption.HideMessage);
 Plymouth.SetQuitFunction(Curruption.Quit);

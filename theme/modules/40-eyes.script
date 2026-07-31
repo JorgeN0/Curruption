@@ -30,6 +30,7 @@ Eyes.glow.SetOpacity(0);
 Eyes.core.SetOpacity(0);
 
 fun Eyes.Update(t) {
+  local.lit;
   lit = hold(t, T.ignite_in, T.ignite_in + Config.eye_duration);
   place(Eyes.glow, Skull.x + Eyes.dx, Skull.y + Eyes.dy, lit * 0.85);
   place(Eyes.core, Skull.x + Eyes.dx, Skull.y + Eyes.dy, lit);
